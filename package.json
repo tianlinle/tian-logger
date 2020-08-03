@@ -1,0 +1,27 @@
+{
+  "name": "tian-logger",
+  "version": "1.0.0",
+  "description": "A simple and configurable logger using async_hooks",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tianlinle/tian-logger.git"
+  },
+  "keywords": [
+    "logger",
+    "async_hooks"
+  ],
+  "author": "tianlinle",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/tianlinle/tian-logger/issues"
+  },
+  "homepage": "https://github.com/tianlinle/tian-logger#readme",
+  "devDependencies": {
+    "@types/node": "^14.0.27",
+    "typescript": "^3.9.7"
+  }
+}
