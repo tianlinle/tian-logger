@@ -1,13 +1,29 @@
 import * as fs from 'fs';
 import * as AsyncHooks from 'async_hooks';
 
-type ConstructorOptions = { level: keyof typeof Logger.levelValue, writer?: (object: Object) => any, meta?: any };
+export type ConstructorOptions = { level: keyof typeof Logger.levelValue, writer?: (object: LoggingObject) => any, meta?: any };
+export type LoggingObject = { level: keyof typeof Logger.levelValue, time: string, message: string, meta: any, data?: any };
+
+export const stringifyReplacer = (k, v) => {
+  const seen = new WeakSet();
+  if (typeof v === "object" && v !== null) {
+    if (seen.has(v)) {
+      return;
+    }
+    seen.add(v);
+    if (v instanceof Error) {
+      v = {
+        name: v.name,
+        message: v.message,
+        stack: typeof v.stack === 'string' ? v.stack.split('\n    ').slice(1) : v.stack
+      };
+    }
+  }
+  return v;
+}
 
 export const defaultWriter = (object) => {
-  if (object instanceof Error) {
-    Object.assign({ message: object.message, stack: object.stack }, object);
-  }
-  fs.writeSync(1, JSON.stringify(object) + "\n");
+  fs.writeSync(1, JSON.stringify(object, stringifyReplacer) + "\n");
 }
 
 export class Logger {
@@ -29,16 +45,14 @@ export class Logger {
     this.asyncIdMap = new Map();
     this.hook = AsyncHooks.createHook({
       init: (asyncId, type, triggerAsyncId) => {
-        fs.writeSync(1, `${triggerAsyncId} > ${asyncId}\n`);
         const ctx = this.asyncIdMap.get(triggerAsyncId);
         this.asyncIdMap.set(asyncId, ctx);
       },
       after: (asyncId) => {
-        fs.writeSync(1, `X ${asyncId}\n`);
         this.asyncIdMap.delete(asyncId);
       }
     }).enable();
-    this.asyncIdMap.set(AsyncHooks.executionAsyncId(), options.meta || {});
+    this.asyncIdMap.set(AsyncHooks.executionAsyncId(), Object.assign({}, options.meta));
   }
 
   attach(meta) {
@@ -50,36 +64,38 @@ export class Logger {
     this.level = Logger.levelValue[level];
   }
 
-  setWriter(writer: (object: Object) => any) {
+  setWriter(writer: (object: LoggingObject) => any) {
     this.writer = writer;
   }
 
-  write(level: keyof typeof Logger.levelValue, message: string | Object, data?: Object) {
+  write(level: keyof typeof Logger.levelValue, message: string, data?: Object) {
     if (Logger.levelValue[level] >= this.level) {
-      const object = {};
-      if (message instanceof Object) {
-        Object.assign(object, message);
-      } else {
-        Object.assign(object, { message });
-      }
-      Object.assign(object, { level, time: new Date().toISOString() }, this.asyncIdMap.get(AsyncHooks.executionAsyncId()), data);
+      data = data || {};
+      Object.assign({}, this.asyncIdMap.get(AsyncHooks.executionAsyncId()), data);
+      const object: LoggingObject = {
+        level,
+        time: new Date().toISOString(),
+        message,
+        meta: this.asyncIdMap.get(AsyncHooks.executionAsyncId()),
+        data
+      };
       return this.writer(object);
     }
   }
 
-  debug(message: string | Object, data?: Object) {
+  debug(message: string, data?: Object) {
     return this.write('debug', message, data);
   }
 
-  info(message: string | Object, data?: Object) {
+  info(message: string, data?: Object) {
     return this.write('info', message, data);
   }
 
-  warn(message: string | Object, data?: Object) {
+  warn(message: string, data?: Object) {
     return this.write('warn', message, data);
   }
 
-  error(message: string | Object, data?: Object) {
+  error(message: string, data?: Object) {
     return this.write('error', message, data);
   }
 }
